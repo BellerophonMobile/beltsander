@@ -24,9 +24,11 @@
 # SOFTWARE.
 ########################################################################
 
-import sys
 import os.path
+import sys
 import xml.etree.ElementTree as ET
+
+from collections import defaultdict
 from subprocess import Popen, PIPE, STDOUT
 
 def error(*args, **kwargs):
@@ -35,111 +37,75 @@ def error(*args, **kwargs):
         kwargs['file'] = sys.stderr
     print('ERROR:', *args, **kwargs)
 
-def main(argv):
-    if len(argv) == 0:
-        error('Must provide test script filename.')
-        return 1
+class TestScript:
+    def __init__(self):
+        self.title = '<unknown>'
+        self.author = '<unknown>'
 
-    testScript = sys.argv[1]
+        self.tests = []
 
-    if not os.path.isfile(testScript):
-        error('Test script {} does not exist.'.format(testScript))
-        return 1
+    def execute(self):
+        numFailures = 0
 
-    try:
-        tree = ET.parse(testScript)
-        root = tree.getroot()
-    except ET.ParseError as e:
-        error('Parse error on script {}: {}'.format(testScript, e))
-        return 1
+        for count, test in enumerate(self.tests, start=1):
+            print('\n########################################################################')
+            print('Test {}: {}'.format(count, test.id))
+            print('Description:', test.description)
+            print('Commmand:\n ', test.command)
 
-    title = root.find('title')
-    if title is None:
-        title = '<unknown>'
-    else:
-        title = title.text
-
-    author = root.find('author')
-    if author is None:
-        author = '<unknown>'
-    else:
-        author = author.text
-
-    print('beltsander executing {}: {} - {}'.format(testScript, title, author))
-
-    someFailures = False
-    for count, test in enumerate(root.findall('test'), start=1):
-        passed = True
-        expected = True
+            if test.execute():
+                print('Status: PASSED')
+            else:
+                print('Status: FAILED')
+                numFailures += 1
 
         print('\n########################################################################')
-        test_id = test.get('id')
-        if test_id is None:
-            test_id = '<unknown>'
-        print('Test {}: {}'.format(count, test_id))
-
-        description = test.find('description')
-        if description != None:
-            description = description.text
-            print('Description:', description)
-
-        exp = test.get('expected')
-        if exp == 'pass' or exp is None:
-            expected = True # The default...
-        elif exp == 'fail':
-            expected = False
+        if numFailures > 0:
+            print('Some tests failed.')
         else:
-            error('Unknown expectation', exp)
-            return 1
+            print('All tests passed.')
 
-        command = test.find('command')
-        if command is None:
-            error('ERROR: Test {} [{}] has no command!'.format(test_id, count))
-            return 1
-        command = command.text
+        return numFailures
 
-        print('Commmand:\n ', command)
+class Test:
+    def __init__(self):
+        self.id = '<unknown>'
+        self.description = ''
+        self.command = None
+        self.input = None
+
+        self.pass_conditions = []
+        self.fail_conditions = []
+
+        # Set with a property
+        self._expected = True
+
+    @property
+    def expected(self):
+        return self._expected
+
+    @expected.setter
+    def expected(self, value):
+        if isinstance(value, bool):
+            self._expected = value
+        elif value == 'fail':
+            self._expected = False
+        elif value == 'pass':
+            self._expected = True
+        else:
+            raise SyntaxError('Unknown "expected" value "{}"'.format(value))
+
+    def execute(self):
+        passed = True
 
         # Command is intentionally run without checking to see if there
         # actually are any accept/fail conditions, so you can cheat and
         # have a dummy test to do any setup or teardown.  - tjkopena
+        p = Popen([self.command], shell=True, stdout=PIPE, stdin=PIPE,
+                universal_newlines=True)
 
-        p = Popen([command], shell=True, stdout=PIPE, stdin=PIPE,
-                  universal_newlines=True)
-
-        commandInput = test.find('input')
-        if commandInput is not None:
-            commandInput = commandInput.text
-        else:
-            commandInput = None
-
-        output = p.communicate(commandInput)[0]
+        output = p.communicate(self.input)[0]
         print('Output:\n', output)
-
-        # This commented-out code would be better, to print as the process
-        # goes.  But closing stdin seems to terminate the process without
-        # any output...  - tjkopena
-
-        #commandInput = test.find('input')
-        #if commandInput != None:
-        #    commandInput = commandInput.text
-        #    print("Input:")
-        #    print(commandInput)
-        #    p.stdin.write(commandInput.encode())
-        #    p.stdin.flush()
-        #    p.stdin.close()
-        #
-        #output = []
-        #print("Output:")
-        #for line in p.stdout:
-        #    line = str(line, 'utf-8')
-        #    if line == '' or p.poll() is not None:
-        #        break
-        #    print(line, end='')
-        #    output.append(line)
-
-        #output = ''.join(output)
-
         print('Return code:', p.returncode)
 
         # Eventually there should be a map from tags to condition
@@ -149,54 +115,133 @@ def main(argv):
         # now... Hardcode!  - tjkopena
 
         #-- Run through battery of acceptance conditions
-        accept = test.find('accept')
-        if accept is not None:
-            for condition in accept:
-                if condition.tag == 'returncode':
-                    if p.returncode != int(condition.text):
-                        print('FAILED: Return code {} != {}'.format(
-                            condition.text, p.returncode))
-                        passed = False
-                elif condition.tag == 'contains':
-                    if not condition.text in output:
-                        print('FAILED: Output does not contain \"{}\"'.format(
-                            condition.text))
-                        passed = False
-                else:
-                    error('Unknown accept condition:', condition.tag)
-                    return 1
+        for condition in self.pass_conditions:
+            if not condition.check(p.returncode, output):
+                if self.expected:
+                    print('FAILED:', condition.error(p.returncode, output))
+                passed = False
 
         #-- Run through battery of failure conditions
-        fail = test.find('fail')
-        if fail is not None:
-            for condition in fail:
-                if condition.tag == 'returncode':
-                    if p.returncode == int(condition.text):
-                        print('FAILED: Return code {} == {}'.format(
-                            condition.text, p.returncode))
-                        passed = False
-                elif condition.tag == 'contains':
-                    if condition.text in output:
-                        print('FAILED: Output contains \"{}\"'.format(
-                            condition.text))
-                        passed = False
-                else:
-                    error('Unknown accept condition:', condition.tag)
-                    return 1
+        for condition in self.fail_conditions:
+            if condition.check(p.returncode, output):
+                passed = False
+            elif not self.expected:
+                print('FAILED:', condition.error(p.returncode, output))
 
-        if passed == expected:
-            print('Status: PASSED')
+        return passed == self.expected
+
+class TestCondition:
+    def __init__(self):
+        self.contains = None
+
+        self._return_code = None
+
+    @property
+    def return_code(self):
+        return self._return_code
+
+    @return_code.setter
+    def return_code(self, value):
+        self._return_code = int(value)
+
+    def check(self, return_code, output):
+        if self.return_code is not None:
+            return self.check_return_code(return_code)
+        elif self.contains is not None:
+            return self.check_contains(output)
         else:
-            print('Status: FAILED')
-            someFailures = True
+            return False
 
-    print('\n########################################################################')
-    if someFailures:
-        print('Some tests failed.')
+    def check_return_code(self, value):
+        return self.return_code == value
+
+    def check_contains(self, value):
+        return self.contains in value
+
+    def error(self, return_code, output):
+        if self.return_code is not None:
+            return 'Return code {} != {}'.format(return_code, self.return_code)
+        elif self.contains is not None:
+            return 'Output does not contain ' + self.contains
+        else:
+            return '<unknown>'
+
+def parse_xml_test(path):
+    script = TestScript()
+
+    try:
+        tree = ET.parse(path)
+        root = tree.getroot()
+    except ET.ParseError as e:
+        error('Parse error on script {}: {}'.format(testScript, e))
+        raise
+
+    script.title = root.findtext('title', '<unknown>')
+    script.author = root.findtext('author', '<unknown>')
+
+    for t in root.findall('test'):
+        test = Test()
+        test.id = t.get('id', '<unknown>')
+        test.description = t.findtext('description', '')
+        test.expected = t.get('expected', True)
+        test.input = t.findtext('input')
+
+        test.command = t.findtext('command')
+        if test.command is None:
+            raise SyntaxError('Test {} has no command!'.format(test.id))
+
+        test.pass_conditions.extend(parse_xml_conditions(t, 'pass'))
+        test.fail_conditions.extend(parse_xml_conditions(t, 'fail'))
+
+        script.tests.append(test)
+
+    return script
+
+def parse_xml_conditions(t, tag):
+    conds = t.find(tag)
+    if conds is None:
+        return
+
+    for c in conds:
+        if c.text is None:
+            error('Empty condition block in {}, skipping...'.format(test.id))
+            continue
+
+        condition = TestCondition()
+        if c.tag == 'returncode':
+            condition.return_code = c.text
+        elif c.tag == 'contains':
+            condition.contains = c.text
+        else:
+            raise SyntaxError('Unknown condition:', condition.tag)
+
+        yield condition
+
+def main(argv):
+    if len(argv) == 0:
+        error('Must provide test script filename.')
         return 1
-    else:
-        print('All tests passed.')
-        return 0
+
+    testScript = argv[0]
+
+    if not os.path.isfile(testScript):
+        error('Test script {} does not exist.'.format(testScript))
+        return 1
+
+    try:
+        if testScript.endswith('.xml'):
+            script = parse_xml_test(testScript)
+        else:
+            error('Unknown test filetype')
+            return 1
+    except:
+        error('Error parsing script')
+        raise
+
+    print('beltsander executing {}: {} - {}'.format(
+        testScript, script.title, script.author))
+
+    return script.execute()
 
 if __name__ == '__main__':
     sys.exit(main(sys.argv[1:]))
