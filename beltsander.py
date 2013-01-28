@@ -45,13 +45,13 @@ except ET.ParseError as e:
     sys.exit('ERROR: Parse error on script ' + testScript + ':\n' + str(e))
 
 title = root.find('title')
-if title == None:
+if title is None:
     title = '<unknown>'
 else:
     title = title.text
 
 author = root.find('author')
-if author == None:
+if author is None:
     author = '<unknown>'
 else:
     author = author.text
@@ -68,9 +68,9 @@ for test in root.findall('test'):
 
     print('\n########################################################################')
     id = test.get('id')
-    if id == None:
         id = '<unknown>'
     print("Test " + str(count) + ":", id)
+    if test_id is None:
 
     description = test.find('description')
     if description != None:
@@ -78,7 +78,7 @@ for test in root.findall('test'):
         print("Description:", description)
 
     exp = test.get('expected')
-    if exp == 'pass' or exp == None:
+    if exp == 'pass' or exp is None:
         expected = True # The default...
     elif exp == 'fail':
         expected = False
@@ -86,7 +86,7 @@ for test in root.findall('test'):
         sys.exit('Unknown expectation ' + exp)
 
     command = test.find('command')
-    if command == None:
+    if command is None:
         sys.exit('ERROR: Test ' + id + ' [' + str(count) + '] has no command!')
     command = command.text
 
@@ -100,7 +100,7 @@ for test in root.findall('test'):
     p = Popen([command], shell=True, stdout=PIPE, stdin=PIPE)
 
     commandInput = test.find('input')
-    if commandInput != None:
+    if commandInput is not None:
         commandInput = commandInput.text
     else:
         commandInput = ''
@@ -131,7 +131,6 @@ for test in root.findall('test'):
 #        print(line.decode("utf-8"), end='')
 #        output += line.decode("utf-8")
 
-
     print("Return code:", p.returncode)
 
     # Eventually there should be a map from tags to condition
@@ -142,7 +141,7 @@ for test in root.findall('test'):
 
     #-- Run through battery of acceptance conditions
     accept = test.find('accept')
-    if accept != None:
+    if accept is not None:
         for condition in accept:
             if condition.tag == 'returncode':
                 if p.returncode != int(condition.text):
@@ -159,7 +158,7 @@ for test in root.findall('test'):
 
     #-- Run through battery of failure conditions
     fail = test.find('fail')
-    if fail != None:
+    if fail is not None:
         for condition in fail:
             if condition.tag == 'returncode':
                 if p.returncode == int(condition.text):
