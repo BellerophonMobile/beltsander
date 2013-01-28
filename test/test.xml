@@ -1,0 +1,33 @@
+<suite>
+  <title>Test Script</title>
+  <author>tjkopena</author>
+
+  <test id="test0">
+    <description>
+      Should say "Hello World!"
+
+      (this test should pass)
+    </description>
+
+    <command>echo "Hello World"</command>
+
+    <accept>
+      <contains>Hello</contains>
+      <returncode>0</returncode>
+    </accept>
+  </test>
+
+  <test id="test0" expected="fail">
+    <description>
+      Should not say "Hello World!"
+
+      (this test should fail, and therefore if it fails it passes)
+    </description>
+
+    <command>echo "Hello World"</command>
+
+    <fail>
+      <contains>Hello</contains>
+    </fail>
+  </test>
+</suite>
