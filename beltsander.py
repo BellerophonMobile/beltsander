@@ -104,18 +104,41 @@ def main(argv):
         # actually are any accept/fail conditions, so you can cheat and
         # have a dummy test to do any setup or teardown.  - tjkopena
 
-        output=[]
-        print('Output:')
-        p = Popen([command], shell=True, stdout=PIPE)
+        p = Popen([command], shell=True, stdout=PIPE, stdin=PIPE,
+                  universal_newlines=True)
 
-        for line in p.stdout:
-            line = str(line, 'utf-8')
-            if line == '' or p.poll() is not None:
-                break
-            print(line, end='')
-            output.append(line)
+        commandInput = test.find('input')
+        if commandInput is not None:
+            commandInput = commandInput.text
+        else:
+            commandInput = None
 
-        output = ''.join(output)
+        output = p.communicate(commandInput)[0]
+        print('Output:\n', output)
+
+        # This commented-out code would be better, to print as the process
+        # goes.  But closing stdin seems to terminate the process without
+        # any output...  - tjkopena
+
+        #commandInput = test.find('input')
+        #if commandInput != None:
+        #    commandInput = commandInput.text
+        #    print("Input:")
+        #    print(commandInput)
+        #    p.stdin.write(commandInput.encode())
+        #    p.stdin.flush()
+        #    p.stdin.close()
+        #
+        #output = []
+        #print("Output:")
+        #for line in p.stdout:
+        #    line = str(line, 'utf-8')
+        #    if line == '' or p.poll() is not None:
+        #        break
+        #    print(line, end='')
+        #    output.append(line)
+
+        #output = ''.join(output)
 
         print('Return code:', p.returncode)
 
