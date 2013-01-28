@@ -105,12 +105,23 @@ for test in root.findall('test'):
     else:
         commandInput = ''
 
+    output = p.communicate(commandInput.encode())[0].decode("utf-8")
+    print("Output:")
+    print(output)
+
+    # This commented-out code would be better, to print as the process
+    # goes.  But closing stdin seems to terminate the process without
+    # any output...  - tjkopena
+
+#    commandInput = test.find('input')
+#    if commandInput != None:
+#        commandInput = commandInput.text
 #        print("Input:")
 #        print(commandInput)
 #        p.stdin.write(commandInput.encode())
 #        p.stdin.flush()
 #        p.stdin.close()
-
+#
 #    output = ''
 #    print("Output:")
 #    while True:
@@ -120,9 +131,6 @@ for test in root.findall('test'):
 #        print(line.decode("utf-8"), end='')
 #        output += line.decode("utf-8")
 
-    output = p.communicate(commandInput.encode())[0].decode("utf-8")
-    print("Output:")
-    print(output)
 
     print("Return code:", p.returncode)
 
