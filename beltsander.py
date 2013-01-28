@@ -97,15 +97,40 @@ for test in root.findall('test'):
     # actually are any accept/fail conditions, so you can cheat and
     # have a dummy test to do any setup or teardown.  - tjkopena
 
-    output=''
+    p = Popen([command], shell=True, stdout=PIPE, stdin=PIPE)
+
+    commandInput = test.find('input')
+    if commandInput != None:
+        commandInput = commandInput.text
+    else:
+        commandInput = ''
+
+    output = p.communicate(commandInput.encode())[0].decode("utf-8")
     print("Output:")
-    p = Popen([command], shell=True, stdout=PIPE)
-    while True:
-        line = p.stdout.readline()
-        if line == '' or p.poll() != None:
-            break
-        print(line.decode("utf-8"), end='')
-        output += line.decode("utf-8")
+    print(output)
+
+    # This commented-out code would be better, to print as the process
+    # goes.  But closing stdin seems to terminate the process without
+    # any output...  - tjkopena
+
+#    commandInput = test.find('input')
+#    if commandInput != None:
+#        commandInput = commandInput.text
+#        print("Input:")
+#        print(commandInput)
+#        p.stdin.write(commandInput.encode())
+#        p.stdin.flush()
+#        p.stdin.close()
+#
+#    output = ''
+#    print("Output:")
+#    while True:
+#        line = p.stdout.readline()
+#        if line == '' or p.poll() != None:
+#            break
+#        print(line.decode("utf-8"), end='')
+#        output += line.decode("utf-8")
+
 
     print("Return code:", p.returncode)
 
