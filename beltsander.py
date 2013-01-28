@@ -176,16 +176,19 @@ def parse_xml_test(path):
         error('Parse error on script {}: {}'.format(testScript, e))
         raise
 
-    script.title = root.findtext('title')
-    script.author = root.findtext('author')
+    script.title = root.findtext('title', '<unknown>')
+    script.author = root.findtext('author', '<unknown>')
 
     for t in root.findall('test'):
         test = Test()
-        test.id = t.get('id')
-        test.description = t.findtext('description')
+        test.id = t.get('id', '<unknown>')
+        test.description = t.findtext('description', '')
         test.expected = t.get('expected', True)
-        test.command = t.findtext('command')
         test.input = t.findtext('input')
+
+        test.command = t.findtext('command')
+        if test.command is None:
+            raise SyntaxError('Test {} has no command!'.format(test.id))
 
         test.pass_conditions.extend(parse_xml_conditions(t, 'pass'))
         test.fail_conditions.extend(parse_xml_conditions(t, 'fail'))
@@ -210,8 +213,7 @@ def parse_xml_conditions(t, tag):
         elif c.tag == 'contains':
             condition.contains = c.text
         else:
-            error('Unknown accept condition:', condition.tag)
-            raise SyntaxError()
+            raise SyntaxError('Unknown condition:', condition.tag)
 
         yield condition
 
