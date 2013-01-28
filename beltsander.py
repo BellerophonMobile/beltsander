@@ -243,14 +243,15 @@ def main(argv):
         #-- Run through battery of acceptance conditions
         for condition in test.pass_conditions:
             if not condition.check(p.returncode, output):
-                print('FAILED:', condition.error(p.returncode, output))
+                if test.expected:
+                    print('FAILED:', condition.error(p.returncode, output))
                 passed = False
 
         #-- Run through battery of failure conditions
         for condition in test.fail_conditions:
             if condition.check(p.returncode, output):
                 passed = False
-            else:
+            elif not test.expected:
                 print('FAILED:', condition.error(p.returncode, output))
 
         if passed == test.expected:
