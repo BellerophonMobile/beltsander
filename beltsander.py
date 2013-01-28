@@ -24,11 +24,11 @@
 # SOFTWARE.
 ########################################################################
 
-import json
 import os.path
 import sys
 import xml.etree.ElementTree as ET
 
+from collections import defaultdict
 from subprocess import Popen, PIPE, STDOUT
 
 def error(*args, **kwargs):
@@ -44,8 +44,28 @@ class TestScript:
 
         self.tests = []
 
-    def __iter__(self):
-        return iter(self.tests)
+    def execute(self):
+        numFailures = 0
+
+        for count, test in enumerate(self.tests, start=1):
+            print('\n########################################################################')
+            print('Test {}: {}'.format(count, test.id))
+            print('Description:', test.description)
+            print('Commmand:\n ', test.command)
+
+            if test.execute():
+                print('Status: PASSED')
+            else:
+                print('Status: FAILED')
+                numFailures += 1
+
+        print('\n########################################################################')
+        if numFailures > 0:
+            print('Some tests failed.')
+        else:
+            print('All tests passed.')
+
+        return numFailures
 
 class Test:
     def __init__(self):
@@ -74,6 +94,41 @@ class Test:
             self._expected = True
         else:
             raise SyntaxError('Unknown "expected" value "{}"'.format(value))
+
+    def execute(self):
+        passed = True
+
+        # Command is intentionally run without checking to see if there
+        # actually are any accept/fail conditions, so you can cheat and
+        # have a dummy test to do any setup or teardown.  - tjkopena
+        p = Popen([self.command], shell=True, stdout=PIPE, stdin=PIPE,
+                universal_newlines=True)
+
+        output = p.communicate(self.input)[0]
+        print('Output:\n', output)
+        print('Return code:', p.returncode)
+
+        # Eventually there should be a map from tags to condition
+        # functions.  The acceptance and failure batteries will just run
+        # through the child notes and apply the appropriate function,
+        # negating the result for the failure battery.  For
+        # now... Hardcode!  - tjkopena
+
+        #-- Run through battery of acceptance conditions
+        for condition in self.pass_conditions:
+            if not condition.check(p.returncode, output):
+                if self.expected:
+                    print('FAILED:', condition.error(p.returncode, output))
+                passed = False
+
+        #-- Run through battery of failure conditions
+        for condition in self.fail_conditions:
+            if condition.check(p.returncode, output):
+                passed = False
+            elif not self.expected:
+                print('FAILED:', condition.error(p.returncode, output))
+
+        return passed == self.expected
 
 class TestCondition:
     def __init__(self):
@@ -160,15 +215,12 @@ def parse_xml_conditions(t, tag):
 
         yield condition
 
-def parse_json_test(path):
-    pass
-
 def main(argv):
     if len(argv) == 0:
         error('Must provide test script filename.')
         return 1
 
-    testScript = sys.argv[1]
+    testScript = argv[0]
 
     if not os.path.isfile(testScript):
         error('Test script {} does not exist.'.format(testScript))
@@ -177,8 +229,6 @@ def main(argv):
     try:
         if testScript.endswith('.xml'):
             script = parse_xml_test(testScript)
-        elif testScript.endswith('.json'):
-            script = parse_json_test(testScript)
         else:
             error('Unknown test filetype')
             return 1
@@ -189,84 +239,7 @@ def main(argv):
     print('beltsander executing {}: {} - {}'.format(
         testScript, script.title, script.author))
 
-    someFailures = False
-    for count, test in enumerate(script.tests, start=1):
-        passed = True
-
-        print('\n########################################################################')
-        print('Test {}: {}'.format(count, test.id))
-        print('Description:', test.description)
-        print('Commmand:\n ', test.command)
-
-        # Command is intentionally run without checking to see if there
-        # actually are any accept/fail conditions, so you can cheat and
-        # have a dummy test to do any setup or teardown.  - tjkopena
-
-        p = Popen([test.command], shell=True, stdout=PIPE, stdin=PIPE,
-                  universal_newlines=True)
-
-        output = p.communicate(test.input)[0]
-        print('Output:\n', output)
-
-        # This commented-out code would be better, to print as the process
-        # goes.  But closing stdin seems to terminate the process without
-        # any output...  - tjkopena
-
-        #commandInput = test.find('input')
-        #if commandInput != None:
-        #    commandInput = commandInput.text
-        #    print("Input:")
-        #    print(commandInput)
-        #    p.stdin.write(commandInput.encode())
-        #    p.stdin.flush()
-        #    p.stdin.close()
-        #
-        #output = []
-        #print("Output:")
-        #for line in p.stdout:
-        #    line = str(line, 'utf-8')
-        #    if line == '' or p.poll() is not None:
-        #        break
-        #    print(line, end='')
-        #    output.append(line)
-
-        #output = ''.join(output)
-
-        print('Return code:', p.returncode)
-
-        # Eventually there should be a map from tags to condition
-        # functions.  The acceptance and failure batteries will just run
-        # through the child notes and apply the appropriate function,
-        # negating the result for the failure battery.  For
-        # now... Hardcode!  - tjkopena
-
-        #-- Run through battery of acceptance conditions
-        for condition in test.pass_conditions:
-            if not condition.check(p.returncode, output):
-                if test.expected:
-                    print('FAILED:', condition.error(p.returncode, output))
-                passed = False
-
-        #-- Run through battery of failure conditions
-        for condition in test.fail_conditions:
-            if condition.check(p.returncode, output):
-                passed = False
-            elif not test.expected:
-                print('FAILED:', condition.error(p.returncode, output))
-
-        if passed == test.expected:
-            print('Status: PASSED')
-        else:
-            print('Status: FAILED')
-            someFailures = True
-
-    print('\n########################################################################')
-    if someFailures:
-        print('Some tests failed.')
-        return 1
-    else:
-        print('All tests passed.')
-        return 0
+    return script.execute()
 
 if __name__ == '__main__':
     sys.exit(main(sys.argv[1:]))
