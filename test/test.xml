@@ -17,7 +17,7 @@
     </accept>
   </test>
 
-  <test id="test0" expected="fail">
+  <test id="test1" expected="fail">
     <description>
       Should not say "Hello World!"
 
@@ -25,6 +25,47 @@
     </description>
 
     <command>echo "Hello World"</command>
+
+    <fail>
+      <contains>Hello</contains>
+    </fail>
+  </test>
+
+  <test id="test2">
+    <description>
+      Should say "Hello World!"
+
+      (this test should pass)
+    </description>
+
+    <command>cat</command>
+
+    <input>
+      Hello World!
+    </input>
+
+    <accept>
+      <contains>Hello</contains>
+    </accept>
+  </test>
+
+
+  <test id="test3" expected="fail">
+    <description>
+      Should say "Hello World!"
+
+      (this test should fail and therefore pass)
+    </description>
+
+    <command>cat</command>
+
+    <input>
+      Hello World!
+    </input>
+
+    <accept>
+      <contains>Mushi</contains>
+    </accept>
 
     <fail>
       <contains>Hello</contains>
