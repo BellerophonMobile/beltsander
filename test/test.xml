@@ -11,10 +11,10 @@
 
     <command>echo "Hello World"</command>
 
-    <accept>
+    <pass>
       <contains>Hello</contains>
       <returncode>0</returncode>
-    </accept>
+    </pass>
   </test>
 
   <test id="test1" expected="fail">
@@ -44,9 +44,9 @@
       Hello World!
     </input>
 
-    <accept>
+    <pass>
       <contains>Hello</contains>
-    </accept>
+    </pass>
   </test>
 
 
@@ -63,9 +63,9 @@
       Hello World!
     </input>
 
-    <accept>
+    <pass>
       <contains>Mushi</contains>
-    </accept>
+    </pass>
 
     <fail>
       <contains>Hello</contains>
