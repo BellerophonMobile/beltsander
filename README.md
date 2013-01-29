@@ -21,7 +21,7 @@ License
 beltsander is released under the MIT license:
 
 > Copyright (c) 2013 Joe Kopena <tjkopena@gmail.com>,
-> Tom Wambold <tom5760@gmail.com
+> Tom Wambold <tom5760@gmail.com>
 >
 > Permission is hereby granted, free of charge, to any person
 > obtaining a copy of this software and associated documentation
