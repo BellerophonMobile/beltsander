@@ -14,6 +14,9 @@ The test test script basically shows all the features.  Execute it like:
 
     ./beltsander.py test/test.xml
 
+To execute the Python test version, run this:
+
+    PYTHONPATH="$(pwd)" python test/test.py
 
 License
 -------
