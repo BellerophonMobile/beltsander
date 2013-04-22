@@ -41,5 +41,17 @@ class TestCase(unittest.TestCase):
                 universal_newlines=True, stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE, stdin=subprocess.PIPE)
 
-        stdout, stderr = p.communicate(stdin, timeout)
+        if isinstance(cmd, str):
+            stdin = [stdin]
+
+        stdout = []
+        stderr = []
+
+        for line in stdin:
+            rv = p.communicate(line, timeout)
+            stdout.append(rv[0])
+            stderr.append(rv[1])
+
+        stdout, stderr = ['\n'.join(x) for x in (stdout, stderr)]
+
         return Command(stdout, stderr, p.returncode)
